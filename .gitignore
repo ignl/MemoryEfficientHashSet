@@ -1,0 +1,10 @@
+.classpath
+.project
+.settings/org.eclipse.jdt.core.prefs
+.settings/org.eclipse.m2e.core.prefs
+target/test-classes/org/intelligentjava/HashSetTest.class
+target/classes/org/intelligentjava/Converter.class
+target/classes/org/intelligentjava/HashSet.class
+target/classes/org/intelligentjava/Main.class
+target/classes/org/intelligentjava/object-explorer.jar
+target/test-classes/org/intelligentjava/ConverterTest.class
