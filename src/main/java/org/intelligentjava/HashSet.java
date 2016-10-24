@@ -7,56 +7,56 @@ import java.util.Set;
 
 /**
  * This HashSet is more memory efficient than the standard java implementation. It converts hexstrings from string to byte array format 
- * and keeps byte arrays (by default size is 16 bytes) as values. Those strings must represent encoded hash value so they can contain only 
- * characters [a-f0-9] - e.g SHA256 hashes.
+ * and keeps byte arrays (by default size is 16 bytes) as values. Good ONLY for the hexadecimal strings e.g. SHA256 hashes, uuids etc.
  * 
  */
 public class HashSet implements Set<String> {
 
+	/** Initial bucket size. */
     private static final int BUCKET_SIZE = 3;
 
+    /** How much to resize bucket when needed. */
     private static final int BUCKET_RESIZE_BY = 2;
 
+    /** Default length of the value */
     private static final int BYTE_ARRAY_VALUE_SIZE = 16;
 
     /**
-     * Number of elements in hashTable. 
-     * Table size is number of elements multiplied with length of one element.
-     * 
+     * Number of elements in hashTable and in data array (same). 
+     * Data array size equals number of elements multiplied by the length of one element.
      */
-    private int numberOfElementsInTable;
+    private int nbOfElements;
 
     /**
-     * Is true when hashTable is full, and is filling hash values from start
+     * Is true when hashTable is full, and is inserting hash values restarts from index 0. 
+     * This flag is required to know that old values in data array is overwritten so hash table must be updated too.
      */
     private boolean isFilled = false;
     
     /**
-     * Length of one element.
+     * Array length of one element.
      */
     private int valueSize;
     
     /**
-     * Index where next value will be put in hash table. After reaching end of
-     * hash table it restarts to 0.
+     * Index where the next value will be put in a data array. After reaching the end of array it restarts to 0.
      */
-    private int currentHashTableIndex;
+    private int currentDataArrayIndex;
 
     /**
-     * Hash table where all hash values(byte arrays) are kept.
+     * Array where all the byte[] values are kept.
      */
-    private byte[] hashTable;
+    private byte[] data;
 
     /**
-     * Hash codes table, where each index represents hash code. Each field saves
-     * bucket of indexes (array of integers), those are indexes of {@link hashTable}.
-     * So this table has pointers where values with provided hash code
-     * are kept in hash table.
+     * Hash codes table. The first array is a hash code and the second array is a bucket for hash code which has 
+     * pointer indexes to the {@link data} array where the real value is.
      */
-    private Object[] indexesByHashCodeTable;
+    private int[][] hashTable;
 
     /**
-     * Constructor. Because no length of value is provided it assumes that length is 16.
+     * Constructor. Default length for entry is set to 16.
+     * 
      * @param size Maximum number of elements in cache.
      */
     public HashSet(int size) {
@@ -72,14 +72,14 @@ public class HashSet implements Set<String> {
     public HashSet(int size, int valueSize) {
         super();
         this.valueSize = valueSize;
-        this.numberOfElementsInTable = size;
-        indexesByHashCodeTable = new Object[numberOfElementsInTable];
+        this.nbOfElements = size;
+        hashTable = new int[nbOfElements][];
         int tableSize = size*valueSize;
-        hashTable = new byte[tableSize];
+        data = new byte[tableSize];
     }
     
     /**
-     * Add value to 
+     * Add value to hash table. Converts hexadecimal string to byte[] array first.
      */
     public boolean add(String s) {
     	// convert to byte array first
@@ -92,7 +92,7 @@ public class HashSet implements Set<String> {
     }
     
     /**
-     * Public method for search operation that takes in string.
+     * Public method for search operation.
      */
     public boolean contains(Object o) {
         String hashValue = (String)o;
@@ -101,27 +101,27 @@ public class HashSet implements Set<String> {
     
 
     /**
-     * Finds out if there is same hash value in hash table.
+     * Finds out if the same value is already in a hash table.
      * 
-     * @param hashValue
-     *            Hash value which we compare with other values with same
+     * @param element
+     *            element which we compare with other values with same
      *            hashCode.
      * @return true if same hash value in hash table is found and false
      *         otherwise.
      */
-    private boolean contains(byte[] o) {
-        int hashCode = hashCode(o);
-        if (indexesByHashCodeTable[hashCode] != null) {
-            int[] indexesBucket = (int[]) indexesByHashCodeTable[hashCode];
+    private boolean contains(byte[] element) {
+        int hashCode = hashCode(element);
+        if (hashTable[hashCode] != null) {
+            int[] indexesBucket = (int[]) hashTable[hashCode];
             int i = 0;
             while (i < indexesBucket.length && indexesBucket[i] != -1) {
-                if (Arrays.equals(o, getValue(indexesBucket[i]))) {
+                if (Arrays.equals(element, getValue(indexesBucket[i]))) {
                     return true;
                 }
                 i++;
                 if (i >= indexesBucket.length) {
                     indexesBucket = resizeBucket(indexesBucket, BUCKET_RESIZE_BY);
-                    indexesByHashCodeTable[hashCode] = indexesBucket;
+                    hashTable[hashCode] = indexesBucket;
                 }
             }
         }
@@ -129,21 +129,21 @@ public class HashSet implements Set<String> {
     }
     
     /**
-     * Clears cache.
+     * Clears hash table.
      */
     public void clear() {
         isFilled = false;
-        Arrays.fill(indexesByHashCodeTable, null);
-        currentHashTableIndex = 0;
+        Arrays.fill(hashTable, null);
+        currentDataArrayIndex = 0;
     }
     
     /**
-     * Return array of hashes which are kept in cache.
+     * Returns an array of values which are kept in cache.
      * 
      * @return Array of hashes represented as String.
      */
     public Object[] toArray() {
-        int numberOfElements = isFilled ? numberOfElementsInTable : currentHashTableIndex;
+        int numberOfElements = isFilled ? nbOfElements : currentDataArrayIndex;
         Object[] hashes = new Object[numberOfElements];
         for (int i = 0; i < numberOfElements; i++) {
             byte[] hashValue = getValue(i);
@@ -160,83 +160,80 @@ public class HashSet implements Set<String> {
      * @return Number of elements.
      */
     public int size() {
-        return isFilled ? numberOfElementsInTable : currentHashTableIndex;
+        return isFilled ? nbOfElements : currentDataArrayIndex;
     }
     
     /**
-     * Gets value by index from hashTable.
+     * Gets value by index from data array.
      * 
      * @param index Value index in hashTable.
      * @return Value.
      */
     private byte[] getValue(int index) {
         byte[] value = new byte[valueSize];
-        System.arraycopy(hashTable, index*valueSize, value, 0, valueSize);
+        System.arraycopy(data, index*valueSize, value, 0, valueSize);
         return value;
     }
     
     /**
-     * Sets value by index to hashTable.
+     * Sets value by index to data array.
      * 
      * @param index Index where value should be put.
      * @param value Value to set.
      */
     private void setValue(int index, byte[] value) {
-        System.arraycopy(value, 0, hashTable, index*valueSize, valueSize);
+        System.arraycopy(value, 0, data, index*valueSize, valueSize);
     }
     
 
     /**
-     * Inserts hash value in {@link hashTable}. It also inserts index of hash
-     * table to {@link hashCodesTable}, so the value could be easily found by
-     * its hash code. Of course removes old index from {@link hashCodesTable}
-     * before inserting new. ({@link hashCodesTable} will always have index i
+     * Inserts  value to {@link data} array and pointers to it to {@link hashTable}.
      * 
-     * @param hashValue
+     * @param value
      *            Value to insert.
      */
-    private void insert(byte[] hashValue) {
+    private void insert(byte[] value) {
 
+    	// once hash table is full new value overwrites old value in data array, for that reason pointer in hashTable to old value is removed
         if (isFilled)
-            removeIndexFromHashCodesTable(currentHashTableIndex);
+            removeIndexFromHashTable(currentDataArrayIndex);
 
-        int hashCode = hashCode(hashValue);
-        setValue(currentHashTableIndex, hashValue);
+        int hashCode = hashCode(value);
+        setValue(currentDataArrayIndex, value);
 
-        if (indexesByHashCodeTable[hashCode] == null) {
+        if (hashTable[hashCode] == null) {
             int[] newIndexesBucket = new int[BUCKET_SIZE];
             Arrays.fill(newIndexesBucket, -1);
-            indexesByHashCodeTable[hashCode] = newIndexesBucket;
-            newIndexesBucket[0] = currentHashTableIndex;
+            hashTable[hashCode] = newIndexesBucket;
+            newIndexesBucket[0] = currentDataArrayIndex;
         } else {
-            int[] indexesBucket = (int[]) indexesByHashCodeTable[hashCode];
+            int[] indexesBucket = (int[]) hashTable[hashCode];
             int index = emptySpaceIndex(indexesBucket);
             // if bucket is full resize it
             if (index == -1) {
                 indexesBucket = resizeBucket(indexesBucket, BUCKET_RESIZE_BY);
-                indexesByHashCodeTable[hashCode] = indexesBucket;
+                hashTable[hashCode] = indexesBucket;
                 index = emptySpaceIndex(indexesBucket);
             }
-            indexesBucket[index] = currentHashTableIndex;
+            indexesBucket[index] = currentDataArrayIndex;
         }
-        currentHashTableIndex++;
-        if (currentHashTableIndex >= numberOfElementsInTable) {
-            currentHashTableIndex = 0;
+        currentDataArrayIndex++;
+        if (currentDataArrayIndex >= nbOfElements) {
+            currentDataArrayIndex = 0;
             isFilled = true;
         }
     }
 
     /**
-     * Removes index from indexesByHashCodeTable. Finds value in hash table,
-     * calculates its hash code, finds index in bucket
-     * indexesByHashCodeTable[hashcode] and removes that index.
+     * Removes element index (or in other words pointer to data array) from {@link hashTable}. Gets value from data array by index,
+     * calculates its hash code, finds index in a bucket (hashTable[hashCode]) and removes that index.
      * 
      * @param index
      *            Index to remove.
      */
-    private void removeIndexFromHashCodesTable(int index) {
+    private void removeIndexFromHashTable(int index) {
         int hashCode = hashCode(getValue(index));
-        int[] indexesBucket = (int[]) indexesByHashCodeTable[hashCode];
+        int[] indexesBucket = (int[]) hashTable[hashCode];
         if (indexesBucket != null) {
             int i = 0;
             while ((i < indexesBucket.length) && (indexesBucket[i] != -1 && indexesBucket[i] != index)) {
@@ -251,13 +248,13 @@ public class HashSet implements Set<String> {
                 indexesBucket[i] = indexesBucket[lastElementIndex];
                 indexesBucket[lastElementIndex] = -1;
                 indexesBucket = shrinkBucketIfNeeded(indexesBucket);
-                indexesByHashCodeTable[hashCode] = indexesBucket;
+                hashTable[hashCode] = indexesBucket;
             }
         }
     }
 
     /**
-     * When removing index from {@link indexesByHashCodeTable} sometimes it is
+     * When removing index from {@link hashTable} sometimes it is
      * needed to shrink the bucket because it was big, and a lot of indexes were
      * removed from it. This method do that to save memory. Also if bucket
      * becomes empty it is removed.
@@ -304,7 +301,7 @@ public class HashSet implements Set<String> {
     }
 
     /**
-     * Searches bucket for a empty space index in bucket.
+     * Searches bucket for an empty space index in bucket.
      * 
      * @param bucket
      *            Bucket to check.
@@ -323,7 +320,7 @@ public class HashSet implements Set<String> {
     }
 
     /**
-     * Searches last element index in bucket.
+     * Gets index of the last element in a bucket.
      * 
      * @param bucket
      *            Bucket to check.
@@ -358,7 +355,7 @@ public class HashSet implements Set<String> {
     }
 
     /**
-     * Prime numbers used for hashcode calculation.
+     * Prime numbers used for hash code calculation.
      */
     private static int[] PRIMES = { 244217, 244219, 244243, 244247, 244253, 244261, 244291, 244297, 244301, 244303,
             244313, 244333, 244339, 244351, 244357, 244367 };
@@ -377,7 +374,7 @@ public class HashSet implements Set<String> {
             int primeNumberIndex = i < PRIMES.length ? i : i % PRIMES.length;
             hash += unsignedByte * PRIMES[primeNumberIndex];
         }
-        return hash % numberOfElementsInTable;
+        return hash % nbOfElements;
     }
 
 	@Override

@@ -16,30 +16,30 @@ public class HashSetTest {
     public void testRemoveIndexFromHashCodesTable() throws SecurityException, NoSuchMethodException, IllegalArgumentException,
             IllegalAccessException, InvocationTargetException, NoSuchFieldException {
         
-        final Method removeIndexFromHashCodesTable = HashSet.class.getDeclaredMethod("removeIndexFromHashCodesTable", int.class);
+        final Method removeIndexFromHashCodesTable = HashSet.class.getDeclaredMethod("removeIndexFromHashTable", int.class);
         removeIndexFromHashCodesTable.setAccessible(true);
-        
-        final Field indexesByHashCodeTable = HashSet.class.getDeclaredField("indexesByHashCodeTable");
-        indexesByHashCodeTable.setAccessible(true);
         
         final Field hashTable = HashSet.class.getDeclaredField("hashTable");
         hashTable.setAccessible(true);
         
+        final Field dataField = HashSet.class.getDeclaredField("data");
+        dataField.setAccessible(true);
+        
         HashSet cache = new HashSet(5);
         
         byte[] hashTableValues = new byte[]{121, 121, 121, 121, 121, 121, 121, 121, 121, 121, 121, 121, 121, 121, 121, 121, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
-        hashTable.set(cache, hashTableValues);
+        dataField.set(cache, hashTableValues);
         // hashcodes for those values. changing hashcode algorithm might fail this test.
-        Object[] indexesByHashCodeTableValues = new Object[] {null, null, new int[]{1, -1, -1}, new int[]{0, 2, -1}, null, null};
-        indexesByHashCodeTable.set(cache, indexesByHashCodeTableValues);
+        Object[] indexesByHashCodeTableValues = new int[][] {null, null, new int[]{1, -1, -1}, new int[]{0, 2, -1}, null, null};
+        hashTable.set(cache, indexesByHashCodeTableValues);
         
         removeIndexFromHashCodesTable.invoke(cache, 0);
         
-        assert (Arrays.deepEquals((Object[])indexesByHashCodeTable.get(cache), new Object[] {null, null, new int[]{1, -1, -1}, new int[]{2, -1, -1}, null, null}));
+        assert (Arrays.deepEquals((Object[])hashTable.get(cache), new Object[] {null, null, new int[]{1, -1, -1}, new int[]{2, -1, -1}, null, null}));
         
         removeIndexFromHashCodesTable.invoke(cache, 2);
         
-        assert (Arrays.deepEquals((Object[])indexesByHashCodeTable.get(cache), new Object[] {null, null, new int[]{1, -1, -1}, null, null, null}));
+        assert (Arrays.deepEquals((Object[])hashTable.get(cache), new Object[] {null, null, new int[]{1, -1, -1}, null, null, null}));
         
     }
     
@@ -49,8 +49,8 @@ public class HashSetTest {
         final Method insert = HashSet.class.getDeclaredMethod("insert", byte[].class);
         insert.setAccessible(true);
         
-        final Field currentHashTableIndex = HashSet.class.getDeclaredField("currentHashTableIndex");
-        currentHashTableIndex.setAccessible(true);
+        final Field currentDataArrayIndex = HashSet.class.getDeclaredField("currentDataArrayIndex");
+        currentDataArrayIndex.setAccessible(true);
         
         HashSet cache = new HashSet(3);
         
@@ -68,22 +68,22 @@ public class HashSetTest {
         insert.invoke(cache, value1);
         byte[] returnedValue1 = (byte[]) getValue.invoke(cache, new Integer(0));
         Assert.assertArrayEquals(returnedValue1, value1);
-        Assert.assertEquals(currentHashTableIndex.getInt(cache), 1);
+        Assert.assertEquals(currentDataArrayIndex.getInt(cache), 1);
 
         insert.invoke(cache, value2);
         byte[] returnedValue2 = (byte[]) getValue.invoke(cache, new Integer(1));
         Assert.assertArrayEquals(returnedValue2, value2);
-        Assert.assertEquals(currentHashTableIndex.getInt(cache), 2);
+        Assert.assertEquals(currentDataArrayIndex.getInt(cache), 2);
         
         insert.invoke(cache, value3);
         byte[] returnedValue3 = (byte[]) getValue.invoke(cache, new Integer(2));
         Assert.assertArrayEquals(returnedValue3, value3);
-        Assert.assertEquals(currentHashTableIndex.getInt(cache), 0);
+        Assert.assertEquals(currentDataArrayIndex.getInt(cache), 0);
 
         insert.invoke(cache, value4);
         byte[] returnedValue4 = (byte[]) getValue.invoke(cache, new Integer(0));
         Assert.assertArrayEquals(returnedValue4, value4);
-        Assert.assertEquals(currentHashTableIndex.getInt(cache), 1);
+        Assert.assertEquals(currentDataArrayIndex.getInt(cache), 1);
         
     }
 
