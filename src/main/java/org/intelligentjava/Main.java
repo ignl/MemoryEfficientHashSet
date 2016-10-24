@@ -25,16 +25,4 @@ public class Main {
 		System.out.println(MemoryMeasurer.measureBytes(memoryEfficientSet));
 	}
 	
-	
-//	public static void main(String[] args) {
-//		LinkedList linkedList = new LinkedList();
-//		linkedList.add(1);
-//		int[] aaa = new int[]{1};
-//		System.out.println(MemoryMeasurer.measureBytes(linkedList));
-//		System.out.println(MemoryMeasurer.measureBytes(aaa));
-//		
-//		System.out.println(MemoryMeasurer.measureBytes(UUID.randomUUID().toString().replaceAll("-", "")));
-//		System.out.println(MemoryMeasurer.measureBytes(new byte[]{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}));
-//	}
-
 }
